@@ -1,0 +1,7 @@
+Thumbs.db
+.DS_Store
+
+# Local visual and browser-test artifacts
+*-preview.png
+sample-*.jpg
+browser-smoke.ps1

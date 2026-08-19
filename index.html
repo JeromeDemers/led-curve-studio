@@ -1,0 +1,2447 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Clicks LED — Curve Studio</title>
+  <style>
+    :root {
+      --ink: #171714;
+      --muted: #807e75;
+      --paper: #f3f1e9;
+      --paper-deep: #e8e5db;
+      --line: #8c897f;
+      --soft-line: #d7d3c8;
+      --accent: #f0502f;
+      --active-color: #f0502f;
+      --shadow: 0 28px 70px rgba(0, 0, 0, .34);
+      font-family: "Courier New", Consolas, monospace;
+      color: var(--ink);
+      background: #14130f;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-width: 320px;
+      background: #14130f;
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      padding: clamp(18px, 4vw, 58px);
+      background:
+        radial-gradient(circle at 50% -10%, rgba(255, 255, 255, .06), transparent 42%),
+        #14130f;
+    }
+
+    button,
+    input,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      color: inherit;
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    textarea:focus-visible,
+    [tabindex]:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--accent) 80%, white);
+      outline-offset: 3px;
+    }
+
+    .app-shell {
+      width: min(1480px, 100%);
+      margin: 0 auto;
+      border: 1px solid #3b3932;
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+
+    .app-header {
+      min-height: 82px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 20px 34px;
+      color: #f4f1e8;
+      background: var(--ink);
+      border-bottom: 1px solid #393730;
+    }
+
+    .brand {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(1.4rem, 2.5vw, 2.25rem);
+      font-style: italic;
+      font-weight: 600;
+      letter-spacing: -.035em;
+    }
+
+    .version {
+      color: #a8a59b;
+      font-size: .66rem;
+      font-weight: 700;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .studio {
+      display: grid;
+      grid-template-columns: minmax(0, 1.08fr) minmax(410px, .92fr);
+      min-height: 760px;
+    }
+
+    .preview-panel,
+    .control-panel {
+      min-width: 0;
+      padding: clamp(24px, 3vw, 42px);
+    }
+
+    .preview-panel {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--line);
+    }
+
+    .control-panel {
+      background:
+        linear-gradient(rgba(255, 255, 255, .18), rgba(255, 255, 255, .18)),
+        var(--paper);
+    }
+
+    .eyebrow,
+    .section-label {
+      margin: 0;
+      color: #aaa79d;
+      font-size: .65rem;
+      font-weight: 700;
+      letter-spacing: .23em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow {
+      margin-bottom: 26px;
+    }
+
+    .stage-shell {
+      flex: 1;
+      min-width: 0;
+      min-height: 420px;
+      display: grid;
+      place-items: center;
+      padding: 12px 0 22px;
+    }
+
+    .image-stage {
+      --stage-ratio: 1.328;
+      position: relative;
+      width: min(100%, calc(68vh * var(--stage-ratio)));
+      max-width: 100%;
+      aspect-ratio: var(--stage-ratio);
+      overflow: hidden;
+      isolation: isolate;
+      background:
+        linear-gradient(45deg, #ddd9cf 25%, transparent 25%),
+        linear-gradient(-45deg, #ddd9cf 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #ddd9cf 75%),
+        linear-gradient(-45deg, transparent 75%, #ddd9cf 75%),
+        #ebe8df;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+      background-size: 16px 16px;
+      box-shadow: 0 18px 36px rgba(46, 42, 33, .12);
+      user-select: none;
+      touch-action: none;
+    }
+
+    .image-stage::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 20;
+      border: 1px solid rgba(23, 23, 20, .18);
+      pointer-events: none;
+    }
+
+    .stage-image {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: fill;
+      pointer-events: none;
+    }
+
+    .drop-curtain {
+      position: absolute;
+      inset: 0;
+      z-index: 30;
+      display: grid;
+      place-items: center;
+      color: white;
+      font-size: .75rem;
+      font-weight: 700;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      background: rgba(20, 19, 15, .78);
+      border: 3px dashed rgba(255, 255, 255, .72);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 130ms ease;
+    }
+
+    .image-stage.drag-over .drop-curtain {
+      opacity: 1;
+    }
+
+    .guide {
+      position: absolute;
+      z-index: 9;
+      display: none;
+      background: rgba(255, 255, 255, .9);
+      box-shadow: 0 0 0 1px rgba(240, 80, 47, .7);
+      pointer-events: none;
+    }
+
+    .guide.vertical {
+      top: 0;
+      bottom: 0;
+      width: 1px;
+    }
+
+    .guide.horizontal {
+      left: 0;
+      right: 0;
+      height: 1px;
+    }
+
+    .led-node {
+      position: absolute;
+      z-index: 8;
+      left: 50%;
+      top: 50%;
+      width: 8%;
+      height: 4%;
+      transform: translate(-50%, -50%);
+      transform-origin: center;
+      cursor: move;
+      touch-action: none;
+    }
+
+    .image-stage:not(.editing) .led-node {
+      pointer-events: none;
+    }
+
+    .light-layer {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(.84);
+      transform-origin: center;
+      pointer-events: none;
+      will-change: opacity, transform;
+    }
+
+    .light-layer.core {
+      z-index: 4;
+      width: 100%;
+      height: 100%;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .95), rgba(255, 255, 255, .18) 38%),
+        var(--active-color);
+      box-shadow:
+        inset 0 0 1px 1px rgba(255, 255, 255, .86),
+        0 0 3px var(--active-color);
+    }
+
+    .light-layer.mid {
+      z-index: 3;
+      background: var(--active-color);
+      mix-blend-mode: screen;
+    }
+
+    .light-layer.halo {
+      z-index: 2;
+      background: var(--active-color);
+      mix-blend-mode: screen;
+    }
+
+    .light-layer.scene {
+      z-index: 1;
+      background: radial-gradient(ellipse, var(--active-color) 0%, color-mix(in srgb, var(--active-color) 54%, transparent) 34%, transparent 74%);
+      mix-blend-mode: screen;
+    }
+
+    .shape-ellipse {
+      border-radius: 50%;
+    }
+
+    .shape-rounded {
+      border-radius: 28%;
+    }
+
+    .shape-bar {
+      border-radius: 999px;
+    }
+
+    .selection-outline {
+      position: absolute;
+      inset: -3px;
+      z-index: 10;
+      display: none;
+      border: 1px dashed rgba(255, 255, 255, .98);
+      box-shadow: 0 0 0 1px rgba(23, 23, 20, .78);
+      pointer-events: none;
+    }
+
+    .image-stage.editing .selection-outline {
+      display: block;
+    }
+
+    .handle {
+      position: absolute;
+      z-index: 12;
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border: 0;
+      border-radius: 50%;
+      background: transparent;
+      transform: translate(-50%, -50%);
+      pointer-events: auto;
+      cursor: nwse-resize;
+    }
+
+    .handle::after {
+      content: "";
+      position: absolute;
+      left: 9px;
+      top: 9px;
+      width: 8px;
+      height: 8px;
+      border: 1px solid #171714;
+      background: white;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, .7);
+    }
+
+    .image-stage:not(.editing) .handle {
+      display: none;
+    }
+
+    .handle[data-handle="nw"] { left: 0; top: 0; }
+    .handle[data-handle="ne"] { left: 100%; top: 0; cursor: nesw-resize; }
+    .handle[data-handle="se"] { left: 100%; top: 100%; }
+    .handle[data-handle="sw"] { left: 0; top: 100%; cursor: nesw-resize; }
+
+    .rotate-stem {
+      position: absolute;
+      z-index: 11;
+      left: 50%;
+      bottom: calc(100% + 2px);
+      width: 1px;
+      height: 26px;
+      display: none;
+      background: white;
+      box-shadow: 0 0 0 1px rgba(23, 23, 20, .5);
+      pointer-events: none;
+    }
+
+    .image-stage.editing .rotate-stem {
+      display: block;
+    }
+
+    .handle.rotate {
+      left: 50%;
+      top: -28px;
+      cursor: grab;
+    }
+
+    .handle.rotate::after {
+      border-radius: 50%;
+    }
+
+    .preview-meta {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 20px;
+      min-height: 54px;
+      margin-top: auto;
+    }
+
+    .drop-hint {
+      max-width: 390px;
+      color: var(--muted);
+      font-size: .66rem;
+      line-height: 1.6;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .intensity-readout {
+      flex: 0 0 auto;
+      margin-left: auto;
+      text-align: right;
+      text-transform: uppercase;
+    }
+
+    .intensity-readout strong {
+      display: block;
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    .intensity-readout span {
+      color: #aaa79d;
+      font-size: .58rem;
+      letter-spacing: .17em;
+    }
+
+    .preview-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    .button {
+      min-height: 36px;
+      padding: 9px 13px;
+      border: 1px solid var(--line);
+      border-radius: 0;
+      color: var(--ink);
+      background: rgba(255, 255, 255, .2);
+      font-size: .66rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: color 110ms ease, background 110ms ease, border-color 110ms ease, transform 110ms ease;
+    }
+
+    .button:hover {
+      border-color: var(--ink);
+      background: white;
+    }
+
+    .button:active {
+      transform: translateY(1px);
+    }
+
+    .button.primary,
+    .button[aria-pressed="true"] {
+      border-color: var(--accent);
+      color: white;
+      background: var(--accent);
+    }
+
+    .button.subtle {
+      min-height: 30px;
+      padding: 6px 9px;
+      font-size: .58rem;
+    }
+
+    .placement-panel {
+      display: none;
+      margin-top: 18px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, .18);
+    }
+
+    .placement-panel.open {
+      display: block;
+    }
+
+    .placement-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px 18px;
+      margin-top: 14px;
+    }
+
+    .field {
+      min-width: 0;
+    }
+
+    .field.full {
+      grid-column: 1 / -1;
+    }
+
+    .field-label {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: .59rem;
+      font-weight: 700;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+    }
+
+    .segmented {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 5px;
+    }
+
+    .segmented .button {
+      min-width: 0;
+      padding-inline: 5px;
+    }
+
+    .range {
+      width: 100%;
+      height: 18px;
+      margin: 0;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .curve-heading {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 20px;
+      margin-bottom: 10px;
+    }
+
+    .time-readout {
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .05em;
+      white-space: nowrap;
+    }
+
+    .curve-frame {
+      position: relative;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, .46);
+    }
+
+    #curveSvg {
+      width: 100%;
+      aspect-ratio: 600 / 260;
+      display: block;
+      overflow: visible;
+      touch-action: none;
+    }
+
+    .grid-line {
+      stroke: var(--soft-line);
+      stroke-width: 1;
+    }
+
+    .axis-label {
+      fill: #aaa79d;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .12em;
+    }
+
+    #curveArea {
+      fill: var(--active-color);
+      fill-opacity: .11;
+      pointer-events: none;
+    }
+
+    #curvePath {
+      fill: none;
+      stroke: var(--ink);
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
+
+    #curveHitPath {
+      fill: none;
+      stroke: transparent;
+      stroke-width: 24;
+      pointer-events: stroke;
+      cursor: crosshair;
+    }
+
+    .point-visible {
+      fill: var(--paper);
+      stroke: var(--ink);
+      stroke-width: 2;
+      pointer-events: none;
+    }
+
+    .point-hit {
+      fill: transparent;
+      stroke: transparent;
+      stroke-width: 22;
+      cursor: grab;
+      outline: none;
+    }
+
+    .curve-point.selected .point-visible {
+      fill: var(--active-color);
+      stroke: white;
+      stroke-width: 3;
+    }
+
+    .curve-point.endpoint .point-visible {
+      stroke-width: 2.5;
+    }
+
+    .playhead-line {
+      stroke: var(--active-color);
+      stroke-width: 1.5;
+      stroke-dasharray: 4 5;
+      pointer-events: none;
+    }
+
+    .playhead-hit {
+      stroke: transparent;
+      stroke-width: 24;
+      cursor: ew-resize;
+    }
+
+    .playhead-dot {
+      fill: var(--active-color);
+      stroke: white;
+      stroke-width: 2;
+      pointer-events: none;
+    }
+
+    .curve-instructions {
+      min-height: 34px;
+      margin: 9px 0 0;
+      color: #aaa79d;
+      font-size: .56rem;
+      line-height: 1.65;
+      letter-spacing: .11em;
+      text-transform: uppercase;
+    }
+
+    .curve-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 10px 0 22px;
+    }
+
+    .control-section {
+      margin-top: 22px;
+    }
+
+    .presets {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      margin-top: 12px;
+    }
+
+    .preset {
+      min-height: 58px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      text-align: left;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .preset:hover,
+    .preset.active {
+      border-color: var(--ink);
+      background: white;
+    }
+
+    .preset.active {
+      box-shadow: inset 3px 0 0 var(--active-color);
+    }
+
+    .preset strong,
+    .preset span {
+      display: block;
+      text-transform: uppercase;
+    }
+
+    .preset strong {
+      font-size: .67rem;
+      letter-spacing: .09em;
+    }
+
+    .preset span {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: .53rem;
+      letter-spacing: .08em;
+    }
+
+    .speed-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 7px;
+    }
+
+    .speed-readout {
+      font-size: .68rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+    }
+
+    .speed-track {
+      position: relative;
+      height: 24px;
+    }
+
+    .speed-track::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 11px;
+      height: 4px;
+      background: var(--ink);
+      pointer-events: none;
+    }
+
+    .speed-track .range {
+      position: relative;
+      z-index: 1;
+      height: 24px;
+      opacity: .92;
+    }
+
+    .swatches {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .swatch {
+      width: 30px;
+      height: 30px;
+      padding: 0;
+      border: 1px solid var(--line);
+      background: var(--swatch);
+      cursor: pointer;
+    }
+
+    .swatch.active {
+      outline: 2px solid var(--ink);
+      outline-offset: 2px;
+    }
+
+    .swatch.rainbow {
+      background: conic-gradient(#f33, #ff0, #0f6, #08f, #b2f, #f33);
+    }
+
+    .custom-color-wrap {
+      position: relative;
+      width: 30px;
+      height: 30px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: white;
+    }
+
+    .custom-color-wrap::after {
+      content: "+";
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: var(--ink);
+      font-weight: 700;
+      pointer-events: none;
+    }
+
+    #customColor {
+      position: absolute;
+      inset: -8px;
+      width: 46px;
+      height: 46px;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .main-actions,
+    .share-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 20px;
+    }
+
+    .share-actions {
+      margin-top: 9px;
+    }
+
+    .status-note {
+      min-height: 18px;
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: .58rem;
+      line-height: 1.5;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .toast {
+      position: fixed;
+      z-index: 100;
+      left: 50%;
+      bottom: 28px;
+      max-width: min(480px, calc(100vw - 32px));
+      padding: 13px 18px;
+      color: white;
+      background: var(--ink);
+      border: 1px solid #5e5b52;
+      box-shadow: 0 16px 45px rgba(0, 0, 0, .35);
+      font-size: .68rem;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      opacity: 0;
+      transform: translate(-50%, 16px);
+      pointer-events: none;
+      transition: opacity 150ms ease, transform 150ms ease;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    dialog {
+      width: min(620px, calc(100vw - 32px));
+      padding: 0;
+      border: 1px solid var(--ink);
+      color: var(--ink);
+      background: var(--paper);
+      box-shadow: 0 30px 80px rgba(0, 0, 0, .4);
+    }
+
+    dialog::backdrop {
+      background: rgba(15, 14, 11, .72);
+    }
+
+    .dialog-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 18px;
+      color: white;
+      background: var(--ink);
+    }
+
+    .dialog-header h2 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 1.2rem;
+      font-style: italic;
+    }
+
+    .dialog-body {
+      padding: 18px;
+    }
+
+    .dialog-body p {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: .68rem;
+      line-height: 1.55;
+      text-transform: uppercase;
+    }
+
+    #importText {
+      width: 100%;
+      min-height: 260px;
+      resize: vertical;
+      padding: 12px;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      background: white;
+      font-size: .72rem;
+      line-height: 1.5;
+    }
+
+    .dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .sr-only {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      padding: 0 !important;
+      margin: -1px !important;
+      overflow: hidden !important;
+      clip: rect(0, 0, 0, 0) !important;
+      white-space: nowrap !important;
+      border: 0 !important;
+    }
+
+    @media (max-width: 1050px) {
+      body {
+        padding: 18px;
+      }
+
+      .studio {
+        grid-template-columns: 1fr;
+      }
+
+      .preview-panel {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .stage-shell {
+        min-height: 360px;
+      }
+    }
+
+    @media (max-width: 620px) {
+      body {
+        padding: 0;
+      }
+
+      .app-header,
+      .preview-panel,
+      .control-panel {
+        padding: 20px;
+      }
+
+      .app-header {
+        min-height: 70px;
+      }
+
+      .version {
+        display: none;
+      }
+
+      .stage-shell {
+        min-height: 280px;
+      }
+
+      .presets {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .placement-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .field.full {
+        grid-column: auto;
+      }
+
+      .drop-hint {
+        display: none;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="app-header">
+      <h1 class="brand">Clicks LED — Curve Studio</h1>
+      <span class="version">v1.0 · layered</span>
+    </header>
+
+    <div class="studio">
+      <section class="preview-panel" aria-labelledby="previewLabel">
+        <p class="eyebrow" id="previewLabel">// Live preview</p>
+
+        <div class="stage-shell">
+          <div class="image-stage" id="imageStage" tabindex="0" aria-label="Image preview. Turn on Edit LED to reposition the light.">
+            <img class="stage-image" id="stageImage" alt="Product preview" draggable="false">
+            <div class="guide vertical" id="guideV"></div>
+            <div class="guide horizontal" id="guideH"></div>
+
+            <div class="led-node" id="ledNode" aria-label="Editable LED region">
+              <div class="light-layer scene shape-bar" id="sceneGlow"></div>
+              <div class="light-layer halo shape-bar" id="haloGlow"></div>
+              <div class="light-layer mid shape-bar" id="midGlow"></div>
+              <div class="light-layer core shape-bar" id="coreGlow"></div>
+              <div class="selection-outline" aria-hidden="true"></div>
+              <div class="rotate-stem" aria-hidden="true"></div>
+              <button class="handle" data-handle="nw" tabindex="-1" aria-label="Resize LED from top left"></button>
+              <button class="handle" data-handle="ne" tabindex="-1" aria-label="Resize LED from top right"></button>
+              <button class="handle" data-handle="se" tabindex="-1" aria-label="Resize LED from bottom right"></button>
+              <button class="handle" data-handle="sw" tabindex="-1" aria-label="Resize LED from bottom left"></button>
+              <button class="handle rotate" data-rotate tabindex="-1" aria-label="Rotate LED"></button>
+            </div>
+
+            <div class="drop-curtain">Drop image to replace</div>
+          </div>
+        </div>
+
+        <div class="preview-meta">
+          <span class="drop-hint">Drop an image here, or choose a local photo. Your image never leaves this browser.</span>
+          <div class="intensity-readout" aria-live="off">
+            <strong id="intensityValue">0%</strong>
+            <span>Intensity</span>
+          </div>
+        </div>
+
+        <div class="preview-actions">
+          <button class="button" id="changeImageBtn" type="button">Change image</button>
+          <button class="button" id="editLedBtn" type="button" aria-pressed="false">Edit LED</button>
+          <button class="button" id="restoreSampleBtn" type="button">Use sample</button>
+          <input class="sr-only" id="imageInput" type="file" accept="image/*">
+        </div>
+
+        <div class="placement-panel" id="placementPanel">
+          <p class="section-label">LED placement</p>
+          <div class="placement-grid">
+            <div class="field full">
+              <div class="field-label"><span>Shape</span></div>
+              <div class="segmented" id="shapeButtons">
+                <button class="button subtle" type="button" data-shape="ellipse">Ellipse</button>
+                <button class="button subtle" type="button" data-shape="rounded">Rounded</button>
+                <button class="button subtle" type="button" data-shape="bar">Thin bar</button>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="glowSpread"><span>Glow spread</span><output id="glowSpreadValue">1.4×</output></label>
+              <input class="range" id="glowSpread" type="range" min=".4" max="3.2" step=".05">
+            </div>
+            <div class="field">
+              <label class="field-label" for="rotationRange"><span>Rotation</span><output id="rotationValue">0°</output></label>
+              <input class="range" id="rotationRange" type="range" min="-180" max="180" step="1">
+            </div>
+            <div class="field full">
+              <button class="button subtle" id="resetPlacementBtn" type="button">Reset placement</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="control-panel" aria-label="Curve and animation controls">
+        <div class="curve-heading">
+          <p class="section-label">Curve · drag points</p>
+          <span class="time-readout" id="timeReadout">0.00s / 3.00s</span>
+        </div>
+
+        <div class="curve-frame">
+          <svg id="curveSvg" viewBox="0 0 600 260" role="application" aria-label="Editable time and intensity curve">
+            <g aria-hidden="true">
+              <line class="grid-line" x1="18" y1="20" x2="582" y2="20"></line>
+              <line class="grid-line" x1="18" y1="72.5" x2="582" y2="72.5"></line>
+              <line class="grid-line" x1="18" y1="125" x2="582" y2="125"></line>
+              <line class="grid-line" x1="18" y1="177.5" x2="582" y2="177.5"></line>
+              <line class="grid-line" x1="18" y1="230" x2="582" y2="230"></line>
+              <line class="grid-line" x1="18" y1="20" x2="18" y2="230"></line>
+              <line class="grid-line" x1="159" y1="20" x2="159" y2="230"></line>
+              <line class="grid-line" x1="300" y1="20" x2="300" y2="230"></line>
+              <line class="grid-line" x1="441" y1="20" x2="441" y2="230"></line>
+              <line class="grid-line" x1="582" y1="20" x2="582" y2="230"></line>
+              <text class="axis-label" x="22" y="33">ON</text>
+              <text class="axis-label" x="22" y="224">OFF</text>
+              <text class="axis-label" x="548" y="224">TIME</text>
+            </g>
+            <path id="curveArea"></path>
+            <path id="curveHitPath"></path>
+            <path id="curvePath"></path>
+            <line class="playhead-hit" id="playheadHit" x1="18" y1="20" x2="18" y2="230"></line>
+            <line class="playhead-line" id="playheadLine" x1="18" y1="20" x2="18" y2="230"></line>
+            <circle class="playhead-dot" id="playheadDot" cx="18" cy="230" r="5"></circle>
+            <g id="pointsLayer"></g>
+          </svg>
+        </div>
+
+        <p class="curve-instructions">Drag handles to shape · double-click curve to add · double-click handle to remove · drag the orange playhead to scrub</p>
+
+        <div class="curve-toolbar">
+          <button class="button subtle" id="addPointBtn" type="button">Add point</button>
+          <button class="button subtle" id="deletePointBtn" type="button">Delete selected</button>
+          <button class="button subtle" id="undoBtn" type="button">Undo</button>
+          <button class="button subtle" id="redoBtn" type="button">Redo</button>
+        </div>
+
+        <section class="control-section" aria-labelledby="presetsLabel">
+          <p class="section-label" id="presetsLabel">Presets</p>
+          <div class="presets">
+            <button class="preset" type="button" data-preset="breathe"><strong>Breathe</strong><span>3.00s · soft</span></button>
+            <button class="preset" type="button" data-preset="heartbeat"><strong>Heartbeat</strong><span>1.00s · pulse</span></button>
+            <button class="preset" type="button" data-preset="alert"><strong>Alert</strong><span>0.50s · fast</span></button>
+            <button class="preset" type="button" data-preset="blink"><strong>Blink</strong><span>1.00s · on/off</span></button>
+            <button class="preset" type="button" data-preset="solid"><strong>Solid</strong><span>Always on</span></button>
+            <button class="preset" type="button" data-preset="off"><strong>Off</strong><span>Always off</span></button>
+          </div>
+        </section>
+
+        <section class="control-section" aria-labelledby="speedLabel">
+          <div class="speed-header">
+            <p class="section-label" id="speedLabel">Cycle speed</p>
+            <span class="speed-readout" id="speedReadout">20 BPM · 3.00s</span>
+          </div>
+          <div class="speed-track">
+            <input class="range" id="durationRange" type="range" min=".25" max="10" step=".05" value="3" aria-label="Cycle duration">
+          </div>
+        </section>
+
+        <section class="control-section" aria-labelledby="colorLabel">
+          <p class="section-label" id="colorLabel">LED color</p>
+          <div class="swatches" id="swatches">
+            <button class="swatch" type="button" data-color="#ff552f" style="--swatch:#ff552f" aria-label="Orange"></button>
+            <button class="swatch" type="button" data-color="#ff210f" style="--swatch:#ff210f" aria-label="Red"></button>
+            <button class="swatch" type="button" data-color="#ffd323" style="--swatch:#ffd323" aria-label="Yellow"></button>
+            <button class="swatch" type="button" data-color="#12c76a" style="--swatch:#12c76a" aria-label="Green"></button>
+            <button class="swatch" type="button" data-color="#15b9ea" style="--swatch:#15b9ea" aria-label="Blue"></button>
+            <button class="swatch" type="button" data-color="#be26dc" style="--swatch:#be26dc" aria-label="Magenta"></button>
+            <button class="swatch" type="button" data-color="#ffffff" style="--swatch:#ffffff" aria-label="White"></button>
+            <button class="swatch rainbow" type="button" data-rainbow aria-label="Rainbow cycling"></button>
+            <label class="custom-color-wrap" aria-label="Choose a custom color"><input id="customColor" type="color" value="#ff552f"></label>
+          </div>
+        </section>
+
+        <div class="main-actions">
+          <button class="button primary" id="playBtn" type="button">Pause</button>
+          <button class="button" id="smoothBtn" type="button" aria-pressed="true">Smooth: on</button>
+          <button class="button" id="linkBtn" type="button" aria-pressed="true">Link ends: on</button>
+          <button class="button" id="resetCurveBtn" type="button">Reset curve</button>
+        </div>
+
+        <div class="share-actions">
+          <button class="button" id="copySettingsBtn" type="button">Copy settings JSON</button>
+          <button class="button" id="importBtn" type="button">Paste / import</button>
+          <button class="button" id="downloadBtn" type="button">Download project JSON</button>
+        </div>
+        <p class="status-note" id="statusNote">Settings save locally. Uploaded images are compressed before storage.</p>
+      </section>
+    </div>
+  </main>
+
+  <dialog id="importDialog">
+    <div class="dialog-header">
+      <h2>Import LED setup</h2>
+      <button class="button" id="closeDialogBtn" type="button">Close</button>
+    </div>
+    <div class="dialog-body">
+      <p>Paste settings JSON or a downloaded project JSON. Values are validated before they are applied.</p>
+      <textarea id="importText" spellcheck="false" placeholder="{ &quot;version&quot;: 1, ... }"></textarea>
+      <div class="dialog-actions">
+        <button class="button" id="clearImportBtn" type="button">Clear</button>
+        <button class="button primary" id="applyImportBtn" type="button">Apply setup</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+  (() => {
+    "use strict";
+
+    const DEFAULT_IMAGE = "data:image/jpeg;base64,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";
+    const SETTINGS_KEY = "ledcurve.v1.settings";
+    const EMBEDDED_SAMPLE = "data:image/jpeg;base64,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";
+    const DB_NAME = "led-curve-studio";
+    const DB_STORE = "assets";
+    const FULL_SAMPLE = "data:image/jpeg;base64," + [
+      "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"
+    ].join("");
+    const PLOT = { x: 18, y: 20, w: 564, h: 210 };
+    const EPSILON = 0.012;
+    const $ = (selector, root = document) => root.querySelector(selector);
+    const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+    const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+    const clone = value => JSON.parse(JSON.stringify(value));
+    const pointId = () => `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+
+    const PRESETS = {
+      breathe: {
+        duration: 3,
+        smooth: true,
+        points: [[0, 0], [.10, .14], [.22, .68], [.36, 1], [.52, .78], [.68, .28], [1, 0]]
+      },
+      heartbeat: {
+        duration: 1,
+        smooth: true,
+        points: [[0, 0], [.09, .03], [.15, 1], [.22, .06], [.31, .68], [.40, .02], [1, 0]]
+      },
+      alert: {
+        duration: .5,
+        smooth: false,
+        points: [[0, 0], [.08, 1], [.28, .15], [.42, 0], [1, 0]]
+      },
+      blink: {
+        duration: 1,
+        smooth: false,
+        points: [[0, 0], [.015, 1], [.49, 1], [.51, 0], [1, 0]]
+      },
+      solid: {
+        duration: 3,
+        smooth: false,
+        points: [[0, 1], [1, 1]]
+      },
+      off: {
+        duration: 3,
+        smooth: false,
+        points: [[0, 0], [1, 0]]
+      }
+    };
+
+    function makePoints(pairs) {
+      return pairs.map(([x, y]) => ({ id: pointId(), x, y }));
+    }
+
+    function defaultLed() {
+      return {
+        x: .693,
+        y: .516,
+        w: .078,
+        h: .046,
+        rotation: -8,
+        shape: "bar",
+        glowSpread: 1.4
+      };
+    }
+
+    function defaultState() {
+      return {
+        version: 1,
+        curve: {
+          points: makePoints(PRESETS.breathe.points),
+          smooth: true,
+          linkEndpoints: true
+        },
+        duration: 3,
+        color: "#ff552f",
+        rainbow: false,
+        phase: 0,
+        playing: true,
+        activePreset: "breathe",
+        modified: false,
+        editMode: false,
+        imageCustom: false,
+        leds: [defaultLed()]
+      };
+    }
+
+    let state = defaultState();
+    let selectedPointId = null;
+    let curveDrag = null;
+    let ledDrag = null;
+    let saveTimer = 0;
+    let toastTimer = 0;
+    let lastFrame = 0;
+    let lastIntensityText = "";
+    let resizeFrame = 0;
+    const undoStack = [];
+    const redoStack = [];
+
+    const stage = $("#imageStage");
+    const stageImage = $("#stageImage");
+    const ledNode = $("#ledNode");
+    const coreGlow = $("#coreGlow");
+    const midGlow = $("#midGlow");
+    const haloGlow = $("#haloGlow");
+    const sceneGlow = $("#sceneGlow");
+    const guideV = $("#guideV");
+    const guideH = $("#guideH");
+    const curveSvg = $("#curveSvg");
+    const curvePath = $("#curvePath");
+    const curveArea = $("#curveArea");
+    const curveHitPath = $("#curveHitPath");
+    const pointsLayer = $("#pointsLayer");
+    const playheadLine = $("#playheadLine");
+    const playheadHit = $("#playheadHit");
+    const playheadDot = $("#playheadDot");
+
+    const led = () => state.leds[0];
+    const xToSvg = x => PLOT.x + x * PLOT.w;
+    const yToSvg = y => PLOT.y + (1 - y) * PLOT.h;
+    const svgToX = x => clamp((x - PLOT.x) / PLOT.w, 0, 1);
+    const svgToY = y => clamp(1 - (y - PLOT.y) / PLOT.h, 0, 1);
+
+    function settingsPayload() {
+      return {
+        version: 1,
+        curve: {
+          points: state.curve.points.map(({ x, y }) => ({ x, y })),
+          smooth: state.curve.smooth,
+          linkEndpoints: state.curve.linkEndpoints
+        },
+        duration: state.duration,
+        color: state.color,
+        rainbow: state.rainbow,
+        phase: state.phase,
+        activePreset: state.activePreset,
+        modified: state.modified,
+        imageCustom: state.imageCustom,
+        leds: clone(state.leds)
+      };
+    }
+
+    function sanitizeSettings(raw) {
+      if (!raw || typeof raw !== "object") throw new Error("Setup must be a JSON object.");
+      const source = raw.settings && typeof raw.settings === "object" ? raw.settings : raw;
+      const clean = defaultState();
+
+      if (source.version !== undefined && Number(source.version) !== 1) {
+        throw new Error("This setup version is not supported.");
+      }
+
+      const incomingPoints = source.curve?.points;
+      if (Array.isArray(incomingPoints) && incomingPoints.length >= 2) {
+        const valid = incomingPoints
+          .map(p => ({ x: Number(p.x), y: Number(p.y) }))
+          .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y))
+          .map(p => ({ id: pointId(), x: clamp(p.x, 0, 1), y: clamp(p.y, 0, 1) }))
+          .sort((a, b) => a.x - b.x);
+        if (valid.length >= 2) {
+          valid[0].x = 0;
+          valid[valid.length - 1].x = 1;
+          const deduped = [];
+          valid.forEach(point => {
+            if (!deduped.length || point.x - deduped[deduped.length - 1].x >= EPSILON || point.x === 1) {
+              deduped.push(point);
+            }
+          });
+          if (deduped.length >= 2) clean.curve.points = deduped;
+        }
+      }
+
+      clean.curve.smooth = source.curve?.smooth !== false;
+      clean.curve.linkEndpoints = source.curve?.linkEndpoints !== false;
+      clean.duration = clamp(Number(source.duration) || 3, .25, 10);
+      clean.color = /^#[0-9a-f]{6}$/i.test(source.color || "") ? source.color : clean.color;
+      clean.rainbow = Boolean(source.rainbow);
+      clean.phase = clamp(Number(source.phase) || 0, 0, .999999);
+      clean.activePreset = typeof source.activePreset === "string" && PRESETS[source.activePreset] ? source.activePreset : null;
+      clean.modified = Boolean(source.modified);
+      clean.imageCustom = Boolean(source.imageCustom);
+
+      if (Array.isArray(source.leds) && source.leds.length) {
+        const incoming = source.leds[0] || {};
+        const base = defaultLed();
+        clean.leds = [{
+          x: clamp(Number(incoming.x) || base.x, 0, 1),
+          y: clamp(Number(incoming.y) || base.y, 0, 1),
+          w: clamp(Number(incoming.w) || base.w, .012, .8),
+          h: clamp(Number(incoming.h) || base.h, .012, .8),
+          rotation: clamp(Number(incoming.rotation) || 0, -180, 180),
+          shape: ["ellipse", "rounded", "bar"].includes(incoming.shape) ? incoming.shape : base.shape,
+          glowSpread: clamp(Number(incoming.glowSpread) || base.glowSpread, .4, 3.2)
+        }];
+      }
+
+      if (clean.curve.linkEndpoints) {
+        clean.curve.points[clean.curve.points.length - 1].y = clean.curve.points[0].y;
+      }
+      return clean;
+    }
+
+    function applySettings(raw, { preserveImage = true, announce = false } = {}) {
+      const currentImageCustom = state.imageCustom;
+      const clean = sanitizeSettings(raw);
+      clean.playing = state.playing;
+      clean.editMode = state.editMode;
+      if (preserveImage) clean.imageCustom = currentImageCustom;
+      state = clean;
+      selectedPointId = null;
+      constrainLedToStage();
+      renderAll();
+      if (announce) showToast("Setup imported");
+    }
+
+    function historySnapshot() {
+      const snapshot = settingsPayload();
+      delete snapshot.imageCustom;
+      return JSON.stringify(snapshot);
+    }
+
+    function pushHistory() {
+      const snapshot = historySnapshot();
+      if (undoStack[undoStack.length - 1] !== snapshot) {
+        undoStack.push(snapshot);
+        if (undoStack.length > 50) undoStack.shift();
+      }
+      redoStack.length = 0;
+      updateHistoryButtons();
+    }
+
+    function undo() {
+      if (!undoStack.length) return;
+      redoStack.push(historySnapshot());
+      applySettings(JSON.parse(undoStack.pop()), { preserveImage: true });
+      updateHistoryButtons();
+    }
+
+    function redo() {
+      if (!redoStack.length) return;
+      undoStack.push(historySnapshot());
+      applySettings(JSON.parse(redoStack.pop()), { preserveImage: true });
+      updateHistoryButtons();
+    }
+
+    function updateHistoryButtons() {
+      $("#undoBtn").disabled = !undoStack.length;
+      $("#redoBtn").disabled = !redoStack.length;
+    }
+
+    function monotoneTangents(points) {
+      const count = points.length;
+      if (count === 2) {
+        const slope = (points[1].y - points[0].y) / (points[1].x - points[0].x || 1);
+        return [slope, slope];
+      }
+      const h = [];
+      const delta = [];
+      for (let i = 0; i < count - 1; i++) {
+        h[i] = points[i + 1].x - points[i].x;
+        delta[i] = (points[i + 1].y - points[i].y) / h[i];
+      }
+      const m = new Array(count);
+      m[0] = delta[0];
+      m[count - 1] = delta[count - 2];
+      for (let i = 1; i < count - 1; i++) {
+        if (delta[i - 1] * delta[i] <= 0) {
+          m[i] = 0;
+        } else {
+          const w1 = 2 * h[i] + h[i - 1];
+          const w2 = h[i] + 2 * h[i - 1];
+          m[i] = (w1 + w2) / (w1 / delta[i - 1] + w2 / delta[i]);
+        }
+      }
+      for (let i = 0; i < count - 1; i++) {
+        if (delta[i] === 0) {
+          m[i] = 0;
+          m[i + 1] = 0;
+          continue;
+        }
+        const a = m[i] / delta[i];
+        const b = m[i + 1] / delta[i];
+        const sum = a * a + b * b;
+        if (sum > 9) {
+          const tau = 3 / Math.sqrt(sum);
+          m[i] = tau * a * delta[i];
+          m[i + 1] = tau * b * delta[i];
+        }
+      }
+      return m;
+    }
+
+    function sampleCurveAt(time) {
+      const points = state.curve.points;
+      const t = clamp(time, 0, 1);
+      if (t <= points[0].x) return points[0].y;
+      if (t >= points[points.length - 1].x) return points[points.length - 1].y;
+      let index = 0;
+      while (index < points.length - 2 && t > points[index + 1].x) index++;
+      const a = points[index];
+      const b = points[index + 1];
+      const h = b.x - a.x || 1;
+      const u = (t - a.x) / h;
+      if (!state.curve.smooth) return clamp(a.y + (b.y - a.y) * u, 0, 1);
+      const tangents = monotoneTangents(points);
+      const u2 = u * u;
+      const u3 = u2 * u;
+      const h00 = 2 * u3 - 3 * u2 + 1;
+      const h10 = u3 - 2 * u2 + u;
+      const h01 = -2 * u3 + 3 * u2;
+      const h11 = u3 - u2;
+      return clamp(h00 * a.y + h10 * h * tangents[index] + h01 * b.y + h11 * h * tangents[index + 1], 0, 1);
+    }
+
+    function renderCurve() {
+      const samples = [];
+      for (let i = 0; i <= 180; i++) {
+        const x = i / 180;
+        samples.push([xToSvg(x), yToSvg(sampleCurveAt(x))]);
+      }
+      const line = samples.map(([x, y], index) => `${index ? "L" : "M"}${x.toFixed(2)} ${y.toFixed(2)}`).join(" ");
+      curvePath.setAttribute("d", line);
+      curveHitPath.setAttribute("d", line);
+      curveArea.setAttribute("d", `M${PLOT.x} ${PLOT.y + PLOT.h} ${line.replace(/^M/, "L")} L${PLOT.x + PLOT.w} ${PLOT.y + PLOT.h} Z`);
+
+      pointsLayer.innerHTML = state.curve.points.map((point, index) => {
+        const endpoint = index === 0 || index === state.curve.points.length - 1;
+        const selected = point.id === selectedPointId;
+        const x = xToSvg(point.x).toFixed(2);
+        const y = yToSvg(point.y).toFixed(2);
+        return `<g class="curve-point${endpoint ? " endpoint" : ""}${selected ? " selected" : ""}" data-point-id="${point.id}" transform="translate(${x} ${y})">
+          <circle class="point-hit" r="13" tabindex="0" role="button" aria-label="Curve point ${index + 1}, ${Math.round(point.y * 100)} percent"></circle>
+          <circle class="point-visible" r="7"></circle>
+        </g>`;
+      }).join("");
+      $("#deletePointBtn").disabled = !selectedPointId || isEndpoint(selectedPointId);
+    }
+
+    function renderControls() {
+      $("#durationRange").value = String(state.duration);
+      $("#speedReadout").textContent = `${Math.round(60 / state.duration)} BPM · ${state.duration.toFixed(2)}s`;
+      $("#playBtn").textContent = state.playing ? "Pause" : "Play";
+      $("#playBtn").classList.toggle("primary", state.playing);
+      $("#smoothBtn").textContent = `Smooth: ${state.curve.smooth ? "on" : "off"}`;
+      $("#smoothBtn").setAttribute("aria-pressed", String(state.curve.smooth));
+      $("#linkBtn").textContent = `Link ends: ${state.curve.linkEndpoints ? "on" : "off"}`;
+      $("#linkBtn").setAttribute("aria-pressed", String(state.curve.linkEndpoints));
+      $("#editLedBtn").setAttribute("aria-pressed", String(state.editMode));
+      $("#editLedBtn").textContent = state.editMode ? "Done editing" : "Edit LED";
+      $("#placementPanel").classList.toggle("open", state.editMode);
+      stage.classList.toggle("editing", state.editMode);
+      $("#glowSpread").value = String(led().glowSpread);
+      $("#glowSpreadValue").textContent = `${led().glowSpread.toFixed(1)}×`;
+      $("#rotationRange").value = String(Math.round(led().rotation));
+      $("#rotationValue").textContent = `${Math.round(led().rotation)}°`;
+      $("#customColor").value = state.color;
+
+      $$(".preset").forEach(button => {
+        button.classList.toggle("active", !state.modified && button.dataset.preset === state.activePreset);
+      });
+      $$(".swatch").forEach(button => {
+        const active = button.hasAttribute("data-rainbow") ? state.rainbow : !state.rainbow && button.dataset.color?.toLowerCase() === state.color.toLowerCase();
+        button.classList.toggle("active", active);
+      });
+      $$("#shapeButtons [data-shape]").forEach(button => {
+        button.setAttribute("aria-pressed", String(button.dataset.shape === led().shape));
+      });
+      updateHistoryButtons();
+    }
+
+    function renderAll() {
+      renderCurve();
+      renderControls();
+      updateLedGeometry();
+      renderAnimation();
+      saveSoon();
+    }
+
+    function currentLightColor() {
+      return state.rainbow ? `hsl(${Math.round(state.phase * 360)} 94% 57%)` : state.color;
+    }
+
+    function renderAnimation() {
+      const raw = sampleCurveAt(state.phase);
+      const previewValue = state.editMode ? .92 : raw;
+      const gamma = Math.pow(previewValue, 2.2);
+      const color = currentLightColor();
+      document.documentElement.style.setProperty("--active-color", color);
+      coreGlow.style.opacity = String(clamp(gamma * 1.35, 0, 1));
+      midGlow.style.opacity = String(clamp(gamma * .92, 0, .92));
+      haloGlow.style.opacity = String(clamp(gamma * .62, 0, .62));
+      sceneGlow.style.opacity = String(clamp(gamma * .34, 0, .34));
+      const scale = .84 + previewValue * .16;
+      [coreGlow, midGlow, haloGlow, sceneGlow].forEach(layer => {
+        layer.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
+      });
+
+      const playX = xToSvg(state.phase);
+      const playY = yToSvg(raw);
+      playheadLine.setAttribute("x1", playX);
+      playheadLine.setAttribute("x2", playX);
+      playheadHit.setAttribute("x1", playX);
+      playheadHit.setAttribute("x2", playX);
+      playheadDot.setAttribute("cx", playX);
+      playheadDot.setAttribute("cy", playY);
+      $("#timeReadout").textContent = `${(state.phase * state.duration).toFixed(2)}s / ${state.duration.toFixed(2)}s`;
+      const text = `${Math.round(raw * 100)}%`;
+      if (text !== lastIntensityText) {
+        $("#intensityValue").textContent = text;
+        lastIntensityText = text;
+      }
+    }
+
+    function animationFrame(timestamp) {
+      if (!lastFrame) lastFrame = timestamp;
+      const delta = Math.min(.1, Math.max(0, (timestamp - lastFrame) / 1000));
+      lastFrame = timestamp;
+      if (state.playing && !curveDrag?.scrubbing) {
+        state.phase = (state.phase + delta / state.duration) % 1;
+      }
+      renderAnimation();
+      requestAnimationFrame(animationFrame);
+    }
+
+    function shapeClass() {
+      return `shape-${led().shape}`;
+    }
+
+    function updateLedGeometry() {
+      const current = led();
+      ledNode.style.left = `${current.x * 100}%`;
+      ledNode.style.top = `${current.y * 100}%`;
+      ledNode.style.width = `${current.w * 100}%`;
+      ledNode.style.height = `${current.h * 100}%`;
+      ledNode.style.transform = `translate(-50%, -50%) rotate(${current.rotation}deg)`;
+      [coreGlow, midGlow, haloGlow, sceneGlow].forEach(layer => {
+        layer.classList.remove("shape-ellipse", "shape-rounded", "shape-bar");
+        layer.classList.add(shapeClass());
+      });
+
+      cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(() => {
+        const stageRect = stage.getBoundingClientRect();
+        if (!stageRect.width || !stageRect.height) return;
+        const width = current.w * stageRect.width;
+        const height = current.h * stageRect.height;
+        const base = Math.max(4, Math.min(width, height));
+        const spread = current.glowSpread;
+        const midPad = base * spread * .65;
+        const haloPad = base * spread * 1.9;
+        const scenePadX = base * spread * 3.8;
+        const scenePadY = base * spread * 2.8;
+
+        setLayerGeometry(midGlow, width + midPad * 2, height + midPad * 2, base * spread * .38);
+        setLayerGeometry(haloGlow, width + haloPad * 2, height + haloPad * 2, base * spread * 1.05);
+        setLayerGeometry(sceneGlow, width + scenePadX * 2, height + scenePadY * 2, base * spread * 1.35);
+      });
+    }
+
+    function setLayerGeometry(layer, width, height, blur) {
+      layer.style.width = `${width}px`;
+      layer.style.height = `${height}px`;
+      layer.style.filter = `blur(${blur.toFixed(1)}px)`;
+    }
+
+    function constrainLedToStage() {
+      const current = led();
+      const rect = stage.getBoundingClientRect();
+      if (!rect.width || !rect.height) {
+        current.x = clamp(current.x, 0, 1);
+        current.y = clamp(current.y, 0, 1);
+        return;
+      }
+      const radians = current.rotation * Math.PI / 180;
+      const width = current.w * rect.width;
+      const height = current.h * rect.height;
+      const extentX = (Math.abs(Math.cos(radians)) * width + Math.abs(Math.sin(radians)) * height) / 2 / rect.width;
+      const extentY = (Math.abs(Math.sin(radians)) * width + Math.abs(Math.cos(radians)) * height) / 2 / rect.height;
+      current.x = clamp(current.x, Math.min(extentX, .49), Math.max(1 - extentX, .51));
+      current.y = clamp(current.y, Math.min(extentY, .49), Math.max(1 - extentY, .51));
+    }
+
+    function markModified() {
+      state.modified = true;
+      state.activePreset = null;
+    }
+
+    function svgPointFromEvent(event) {
+      const point = curveSvg.createSVGPoint();
+      point.x = event.clientX;
+      point.y = event.clientY;
+      return point.matrixTransform(curveSvg.getScreenCTM().inverse());
+    }
+
+    function isEndpoint(id) {
+      const points = state.curve.points;
+      return points[0]?.id === id || points[points.length - 1]?.id === id;
+    }
+
+    function addPointAt(x, y = sampleCurveAt(x)) {
+      const points = state.curve.points;
+      const position = clamp(x, EPSILON, 1 - EPSILON);
+      let insertion = points.findIndex(point => point.x > position);
+      if (insertion < 1) insertion = 1;
+      const minX = points[insertion - 1].x + EPSILON;
+      const maxX = points[insertion].x - EPSILON;
+      if (minX > maxX) {
+        showToast("No room for another point here");
+        return;
+      }
+      pushHistory();
+      const point = { id: pointId(), x: clamp(position, minX, maxX), y: clamp(y, 0, 1) };
+      points.splice(insertion, 0, point);
+      selectedPointId = point.id;
+      markModified();
+      renderAll();
+    }
+
+    function deletePoint(id) {
+      if (!id || isEndpoint(id) || state.curve.points.length <= 2) {
+        showToast("Endpoints cannot be removed");
+        return;
+      }
+      pushHistory();
+      state.curve.points = state.curve.points.filter(point => point.id !== id);
+      selectedPointId = null;
+      markModified();
+      renderAll();
+    }
+
+    curveSvg.addEventListener("pointerdown", event => {
+      const pointGroup = event.target.closest?.("[data-point-id]");
+      const scrubbing = event.target === playheadHit || event.target === playheadDot || event.target === playheadLine;
+      if (!pointGroup && !scrubbing) return;
+      event.preventDefault();
+      curveSvg.setPointerCapture(event.pointerId);
+      if (scrubbing) {
+        curveDrag = { pointerId: event.pointerId, scrubbing: true, wasPlaying: state.playing };
+        state.playing = false;
+        renderControls();
+        scrubFromEvent(event);
+        return;
+      }
+      const id = pointGroup.dataset.pointId;
+      selectedPointId = id;
+      pushHistory();
+      curveDrag = { pointerId: event.pointerId, id, scrubbing: false };
+      renderCurve();
+    });
+
+    curveSvg.addEventListener("pointermove", event => {
+      if (!curveDrag || curveDrag.pointerId !== event.pointerId) return;
+      event.preventDefault();
+      if (curveDrag.scrubbing) {
+        scrubFromEvent(event);
+        return;
+      }
+      const point = svgPointFromEvent(event);
+      const points = state.curve.points;
+      const index = points.findIndex(item => item.id === curveDrag.id);
+      if (index < 0) return;
+      const target = points[index];
+      target.y = svgToY(point.y);
+      if (index > 0 && index < points.length - 1) {
+        target.x = clamp(svgToX(point.x), points[index - 1].x + EPSILON, points[index + 1].x - EPSILON);
+      }
+      if (state.curve.linkEndpoints && (index === 0 || index === points.length - 1)) {
+        points[index === 0 ? points.length - 1 : 0].y = target.y;
+      }
+      markModified();
+      renderCurve();
+      renderControls();
+    });
+
+    function endCurveDrag(event) {
+      if (!curveDrag || curveDrag.pointerId !== event.pointerId) return;
+      curveSvg.releasePointerCapture?.(event.pointerId);
+      curveDrag = null;
+      saveSoon();
+    }
+
+    curveSvg.addEventListener("pointerup", endCurveDrag);
+    curveSvg.addEventListener("pointercancel", endCurveDrag);
+
+    function scrubFromEvent(event) {
+      const point = svgPointFromEvent(event);
+      state.phase = svgToX(point.x);
+      renderAnimation();
+    }
+
+    curveSvg.addEventListener("dblclick", event => {
+      const group = event.target.closest?.("[data-point-id]");
+      if (group) {
+        deletePoint(group.dataset.pointId);
+        return;
+      }
+      const point = svgPointFromEvent(event);
+      if (point.x >= PLOT.x && point.x <= PLOT.x + PLOT.w && point.y >= PLOT.y && point.y <= PLOT.y + PLOT.h) {
+        addPointAt(svgToX(point.x), svgToY(point.y));
+      }
+    });
+
+    curveSvg.addEventListener("keydown", event => {
+      if (event.code === "Space") {
+        event.preventDefault();
+        togglePlayback();
+        return;
+      }
+      if ((event.key === "Delete" || event.key === "Backspace") && selectedPointId) {
+        event.preventDefault();
+        deletePoint(selectedPointId);
+        return;
+      }
+      const group = event.target.closest?.("[data-point-id]");
+      if (!group || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+      event.preventDefault();
+      const target = state.curve.points.find(point => point.id === group.dataset.pointId);
+      if (!target) return;
+      pushHistory();
+      const step = event.shiftKey ? .05 : .01;
+      if (event.key === "ArrowUp") target.y = clamp(target.y + step, 0, 1);
+      if (event.key === "ArrowDown") target.y = clamp(target.y - step, 0, 1);
+      const index = state.curve.points.indexOf(target);
+      if (index > 0 && index < state.curve.points.length - 1) {
+        if (event.key === "ArrowLeft") target.x = clamp(target.x - step, state.curve.points[index - 1].x + EPSILON, state.curve.points[index + 1].x - EPSILON);
+        if (event.key === "ArrowRight") target.x = clamp(target.x + step, state.curve.points[index - 1].x + EPSILON, state.curve.points[index + 1].x - EPSILON);
+      }
+      if (state.curve.linkEndpoints && isEndpoint(target.id)) {
+        state.curve.points[index === 0 ? state.curve.points.length - 1 : 0].y = target.y;
+      }
+      selectedPointId = target.id;
+      markModified();
+      renderAll();
+    });
+
+    function applyPreset(name) {
+      const preset = PRESETS[name];
+      if (!preset) return;
+      pushHistory();
+      state.curve.points = makePoints(preset.points);
+      state.curve.smooth = preset.smooth;
+      state.curve.linkEndpoints = true;
+      state.duration = preset.duration;
+      state.activePreset = name;
+      state.modified = false;
+      state.phase = 0;
+      selectedPointId = null;
+      renderAll();
+    }
+
+    function togglePlayback() {
+      state.playing = !state.playing;
+      renderControls();
+      saveSoon();
+    }
+
+    function stagePoint(event) {
+      const rect = stage.getBoundingClientRect();
+      return {
+        x: clamp((event.clientX - rect.left) / rect.width, 0, 1),
+        y: clamp((event.clientY - rect.top) / rect.height, 0, 1),
+        px: event.clientX - rect.left,
+        py: event.clientY - rect.top,
+        rect
+      };
+    }
+
+    function beginLedDrag(event) {
+      if (!state.editMode) return;
+      event.preventDefault();
+      event.stopPropagation();
+      stage.setPointerCapture(event.pointerId);
+      const point = stagePoint(event);
+      const current = clone(led());
+      const handle = event.target.closest?.("[data-handle]")?.dataset.handle;
+      const rotating = Boolean(event.target.closest?.("[data-rotate]"));
+      pushHistory();
+
+      if (rotating) {
+        const centerX = current.x * point.rect.width;
+        const centerY = current.y * point.rect.height;
+        ledDrag = {
+          type: "rotate",
+          pointerId: event.pointerId,
+          start: current,
+          startAngle: Math.atan2(point.py - centerY, point.px - centerX) * 180 / Math.PI
+        };
+      } else if (handle) {
+        ledDrag = {
+          type: "resize",
+          pointerId: event.pointerId,
+          handle,
+          start: current,
+          startPx: point.px,
+          startPy: point.py,
+          rect: point.rect
+        };
+      } else {
+        ledDrag = {
+          type: "move",
+          pointerId: event.pointerId,
+          start: current,
+          startX: point.x,
+          startY: point.y
+        };
+      }
+    }
+
+    ledNode.addEventListener("pointerdown", beginLedDrag);
+
+    stage.addEventListener("pointerdown", event => {
+      if (!state.editMode || event.target.closest?.("#ledNode")) return;
+      event.preventDefault();
+      pushHistory();
+      const point = stagePoint(event);
+      led().x = point.x;
+      led().y = point.y;
+      constrainLedToStage();
+      updateLedGeometry();
+      saveSoon();
+    });
+
+    stage.addEventListener("pointermove", event => {
+      if (!ledDrag || ledDrag.pointerId !== event.pointerId) return;
+      event.preventDefault();
+      const point = stagePoint(event);
+      if (ledDrag.type === "move") {
+        let x = ledDrag.start.x + point.x - ledDrag.startX;
+        let y = ledDrag.start.y + point.y - ledDrag.startY;
+        if (event.shiftKey) {
+          const dx = Math.abs(x - ledDrag.start.x);
+          const dy = Math.abs(y - ledDrag.start.y);
+          if (dx > dy) y = ledDrag.start.y;
+          else x = ledDrag.start.x;
+        }
+        const snapped = snapPosition(x, y, point.rect);
+        led().x = snapped.x;
+        led().y = snapped.y;
+      } else if (ledDrag.type === "rotate") {
+        const centerX = ledDrag.start.x * point.rect.width;
+        const centerY = ledDrag.start.y * point.rect.height;
+        const angle = Math.atan2(point.py - centerY, point.px - centerX) * 180 / Math.PI;
+        let rotation = ledDrag.start.rotation + angle - ledDrag.startAngle;
+        if (event.shiftKey) rotation = Math.round(rotation / 15) * 15;
+        led().rotation = ((rotation + 180) % 360 + 360) % 360 - 180;
+      } else if (ledDrag.type === "resize") {
+        resizeLedFromPointer(event, point);
+      }
+      constrainLedToStage();
+      updateLedGeometry();
+      renderControls();
+    });
+
+    function resizeLedFromPointer(event, point) {
+      const drag = ledDrag;
+      const start = drag.start;
+      const sx = drag.handle.includes("e") ? 1 : -1;
+      const sy = drag.handle.includes("s") ? 1 : -1;
+      const dx = point.px - drag.startPx;
+      const dy = point.py - drag.startPy;
+      const radians = start.rotation * Math.PI / 180;
+      const cos = Math.cos(radians);
+      const sin = Math.sin(radians);
+      const localDx = dx * cos + dy * sin;
+      const localDy = -dx * sin + dy * cos;
+      const startWidth = start.w * drag.rect.width;
+      const startHeight = start.h * drag.rect.height;
+      let width = Math.max(8, startWidth + sx * localDx);
+      let height = Math.max(8, startHeight + sy * localDy);
+
+      if (event.shiftKey) {
+        const ratio = startWidth / startHeight;
+        if (Math.abs(localDx / startWidth) > Math.abs(localDy / startHeight)) height = width / ratio;
+        else width = height * ratio;
+      }
+
+      const effectiveDx = sx * (width - startWidth);
+      const effectiveDy = sy * (height - startHeight);
+      const centerLocalX = effectiveDx / 2;
+      const centerLocalY = effectiveDy / 2;
+      const centerDx = centerLocalX * cos - centerLocalY * sin;
+      const centerDy = centerLocalX * sin + centerLocalY * cos;
+      led().w = clamp(width / drag.rect.width, .012, .8);
+      led().h = clamp(height / drag.rect.height, .012, .8);
+      led().x = start.x + centerDx / drag.rect.width;
+      led().y = start.y + centerDy / drag.rect.height;
+    }
+
+    function snapPosition(x, y, rect) {
+      const values = [1 / 3, .5, 2 / 3];
+      const thresholdX = 8 / rect.width;
+      const thresholdY = 8 / rect.height;
+      let snapX = null;
+      let snapY = null;
+      values.forEach(value => {
+        if (Math.abs(x - value) < thresholdX && (snapX === null || Math.abs(x - value) < Math.abs(x - snapX))) snapX = value;
+        if (Math.abs(y - value) < thresholdY && (snapY === null || Math.abs(y - value) < Math.abs(y - snapY))) snapY = value;
+      });
+      showGuides(snapX, snapY);
+      return { x: snapX ?? x, y: snapY ?? y };
+    }
+
+    function showGuides(x, y) {
+      guideV.style.display = x === null ? "none" : "block";
+      guideH.style.display = y === null ? "none" : "block";
+      if (x !== null) guideV.style.left = `${x * 100}%`;
+      if (y !== null) guideH.style.top = `${y * 100}%`;
+    }
+
+    function endLedDrag(event) {
+      if (!ledDrag || ledDrag.pointerId !== event.pointerId) return;
+      stage.releasePointerCapture?.(event.pointerId);
+      ledDrag = null;
+      showGuides(null, null);
+      saveSoon();
+    }
+
+    stage.addEventListener("pointerup", endLedDrag);
+    stage.addEventListener("pointercancel", endLedDrag);
+
+    stage.addEventListener("keydown", event => {
+      if (!state.editMode) return;
+      if (event.key === "Escape") {
+        state.editMode = false;
+        renderControls();
+        return;
+      }
+      if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+      event.preventDefault();
+      pushHistory();
+      const amount = event.shiftKey ? .01 : .002;
+      if (event.key === "ArrowLeft") led().x -= amount;
+      if (event.key === "ArrowRight") led().x += amount;
+      if (event.key === "ArrowUp") led().y -= amount;
+      if (event.key === "ArrowDown") led().y += amount;
+      constrainLedToStage();
+      updateLedGeometry();
+      saveSoon();
+    });
+
+    function setImageSource(source, custom) {
+      return new Promise((resolve, reject) => {
+        stageImage.onload = () => {
+          const ratio = stageImage.naturalWidth / stageImage.naturalHeight || 1;
+          stage.style.setProperty("--stage-ratio", String(ratio));
+          stage.style.aspectRatio = String(ratio);
+          state.imageCustom = custom;
+          requestAnimationFrame(() => {
+            constrainLedToStage();
+            updateLedGeometry();
+          });
+          resolve();
+        };
+        stageImage.onerror = () => reject(new Error("The image could not be opened."));
+        stageImage.src = source;
+      });
+    }
+
+    async function processImageFile(file) {
+      if (!file || !file.type.startsWith("image/")) throw new Error("Choose an image file.");
+      const objectUrl = URL.createObjectURL(file);
+      try {
+        const image = new Image();
+        await new Promise((resolve, reject) => {
+          image.onload = resolve;
+          image.onerror = () => reject(new Error("The selected image could not be decoded."));
+          image.src = objectUrl;
+        });
+        const maxEdge = 1600;
+        const scale = Math.min(1, maxEdge / Math.max(image.naturalWidth, image.naturalHeight));
+        const width = Math.max(1, Math.round(image.naturalWidth * scale));
+        const height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d", { alpha: true });
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = "high";
+        context.drawImage(image, 0, 0, width, height);
+        let dataUrl = canvas.toDataURL("image/webp", .86);
+        if (!dataUrl.startsWith("data:image/webp")) dataUrl = canvas.toDataURL("image/jpeg", .86);
+        return dataUrl;
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    }
+
+    async function useImageFile(file) {
+      try {
+        showToast("Preparing image…");
+        const dataUrl = await processImageFile(file);
+        pushHistory();
+        await setImageSource(dataUrl, true);
+        try {
+          await idbPut("currentImage", dataUrl);
+          $("#statusNote").textContent = "Image and settings saved locally in this browser.";
+        } catch {
+          $("#statusNote").textContent = "Image is available for this session; browser storage is unavailable.";
+          showToast("Image loaded; persistent image storage unavailable");
+        }
+        saveNow();
+        showToast("Image ready — choose Edit LED to place the light");
+      } catch (error) {
+        showToast(error.message || "Could not load image");
+      }
+    }
+
+    function openDatabase() {
+      return new Promise((resolve, reject) => {
+        if (!("indexedDB" in window)) {
+          reject(new Error("IndexedDB unavailable"));
+          return;
+        }
+        let request;
+        try {
+          request = indexedDB.open(DB_NAME, 1);
+        } catch (error) {
+          reject(error);
+          return;
+        }
+        request.onupgradeneeded = () => {
+          if (!request.result.objectStoreNames.contains(DB_STORE)) request.result.createObjectStore(DB_STORE);
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error || new Error("Image storage unavailable"));
+      });
+    }
+
+    async function idbPut(key, value) {
+      const database = await openDatabase();
+      return new Promise((resolve, reject) => {
+        const transaction = database.transaction(DB_STORE, "readwrite");
+        transaction.objectStore(DB_STORE).put(value, key);
+        transaction.oncomplete = () => {
+          database.close();
+          resolve();
+        };
+        transaction.onerror = () => {
+          database.close();
+          reject(transaction.error);
+        };
+      });
+    }
+
+    async function idbGet(key) {
+      const database = await openDatabase();
+      return new Promise((resolve, reject) => {
+        const transaction = database.transaction(DB_STORE, "readonly");
+        const request = transaction.objectStore(DB_STORE).get(key);
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => reject(request.error);
+        transaction.oncomplete = () => database.close();
+      });
+    }
+
+    async function idbDelete(key) {
+      const database = await openDatabase();
+      return new Promise((resolve, reject) => {
+        const transaction = database.transaction(DB_STORE, "readwrite");
+        transaction.objectStore(DB_STORE).delete(key);
+        transaction.oncomplete = () => {
+          database.close();
+          resolve();
+        };
+        transaction.onerror = () => reject(transaction.error);
+      });
+    }
+
+    function saveSoon() {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(saveNow, 240);
+    }
+
+    function saveNow() {
+      try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settingsPayload()));
+      } catch {
+        $("#statusNote").textContent = "Settings are session-only because browser storage is unavailable.";
+      }
+    }
+
+    function restoreSavedSettings() {
+      try {
+        const saved = localStorage.getItem(SETTINGS_KEY);
+        if (saved) {
+          const clean = sanitizeSettings(JSON.parse(saved));
+          clean.playing = true;
+          clean.editMode = false;
+          state = clean;
+        }
+      } catch {
+        state = defaultState();
+        $("#statusNote").textContent = "Saved settings were invalid; defaults were restored.";
+      }
+    }
+
+    async function copyText(text) {
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch {}
+      }
+      const helper = document.createElement("textarea");
+      helper.value = text;
+      helper.setAttribute("readonly", "");
+      helper.style.position = "fixed";
+      helper.style.opacity = "0";
+      document.body.appendChild(helper);
+      helper.select();
+      let copied = false;
+      try {
+        copied = document.execCommand("copy");
+      } catch {}
+      helper.remove();
+      return copied;
+    }
+
+    async function copySettings() {
+      const text = JSON.stringify(settingsPayload(), null, 2);
+      if (await copyText(text)) {
+        showToast("Settings JSON copied");
+      } else {
+        $("#importText").value = text;
+        openImportDialog();
+        $("#importText").select();
+        showToast("Copy unavailable — JSON selected in the dialog");
+      }
+    }
+
+    function openImportDialog() {
+      const dialog = $("#importDialog");
+      if (typeof dialog.showModal === "function") dialog.showModal();
+      else dialog.setAttribute("open", "");
+      setTimeout(() => $("#importText").focus(), 0);
+    }
+
+    function closeImportDialog() {
+      const dialog = $("#importDialog");
+      if (typeof dialog.close === "function") dialog.close();
+      else dialog.removeAttribute("open");
+    }
+
+    async function applyImportedText() {
+      try {
+        const raw = JSON.parse($("#importText").value);
+        pushHistory();
+        applySettings(raw, { preserveImage: !raw.imageDataUrl, announce: false });
+        if (typeof raw.imageDataUrl === "string" && raw.imageDataUrl.startsWith("data:image/")) {
+          await setImageSource(raw.imageDataUrl, true);
+          try {
+            await idbPut("currentImage", raw.imageDataUrl);
+          } catch {}
+        }
+        saveNow();
+        closeImportDialog();
+        showToast("Setup imported");
+      } catch (error) {
+        showToast(error.message || "Invalid JSON");
+      }
+    }
+
+    function downloadProject() {
+      const project = {
+        type: "led-curve-studio-project",
+        settings: settingsPayload(),
+        imageDataUrl: stageImage.src
+      };
+      const blob = new Blob([JSON.stringify(project, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `led-curve-project-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      showToast("Project JSON downloaded");
+    }
+
+    function showToast(message) {
+      const toast = $("#toast");
+      toast.textContent = message;
+      toast.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove("show"), 2600);
+    }
+
+    $("#changeImageBtn").addEventListener("click", () => $("#imageInput").click());
+    $("#imageInput").addEventListener("change", event => {
+      const [file] = event.target.files;
+      if (file) useImageFile(file);
+      event.target.value = "";
+    });
+
+    let dragDepth = 0;
+    stage.addEventListener("dragenter", event => {
+      event.preventDefault();
+      dragDepth++;
+      stage.classList.add("drag-over");
+    });
+    stage.addEventListener("dragover", event => event.preventDefault());
+    stage.addEventListener("dragleave", event => {
+      event.preventDefault();
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (!dragDepth) stage.classList.remove("drag-over");
+    });
+    stage.addEventListener("drop", event => {
+      event.preventDefault();
+      dragDepth = 0;
+      stage.classList.remove("drag-over");
+      const [file] = [...event.dataTransfer.files].filter(item => item.type.startsWith("image/"));
+      if (file) useImageFile(file);
+      else showToast("Drop an image file");
+    });
+
+    $("#restoreSampleBtn").addEventListener("click", async () => {
+      pushHistory();
+      await setImageSource(FULL_SAMPLE, false);
+      state.leds[0] = defaultLed();
+      try {
+        await idbDelete("currentImage");
+      } catch {}
+      renderAll();
+      showToast("Retouched sample restored");
+    });
+
+    $("#editLedBtn").addEventListener("click", () => {
+      state.editMode = !state.editMode;
+      renderControls();
+      renderAnimation();
+      if (state.editMode) {
+        stage.focus();
+        showToast("Drag the LED; use handles to resize and rotate");
+      }
+      saveSoon();
+    });
+
+    $("#resetPlacementBtn").addEventListener("click", () => {
+      pushHistory();
+      state.leds[0] = defaultLed();
+      constrainLedToStage();
+      renderAll();
+    });
+
+    $$("#shapeButtons [data-shape]").forEach(button => {
+      button.addEventListener("click", () => {
+        pushHistory();
+        led().shape = button.dataset.shape;
+        if (led().shape === "bar" && led().h > led().w * .65) led().h = Math.max(.012, led().w * .42);
+        renderAll();
+      });
+    });
+
+    $("#glowSpread").addEventListener("input", event => {
+      led().glowSpread = Number(event.target.value);
+      updateLedGeometry();
+      renderControls();
+    });
+    $("#glowSpread").addEventListener("pointerdown", pushHistory);
+    $("#glowSpread").addEventListener("change", saveSoon);
+
+    $("#rotationRange").addEventListener("input", event => {
+      led().rotation = Number(event.target.value);
+      constrainLedToStage();
+      updateLedGeometry();
+      renderControls();
+    });
+    $("#rotationRange").addEventListener("pointerdown", pushHistory);
+    $("#rotationRange").addEventListener("change", saveSoon);
+
+    $$(".preset").forEach(button => button.addEventListener("click", () => applyPreset(button.dataset.preset)));
+    $("#playBtn").addEventListener("click", togglePlayback);
+    $("#smoothBtn").addEventListener("click", () => {
+      pushHistory();
+      state.curve.smooth = !state.curve.smooth;
+      markModified();
+      renderAll();
+    });
+    $("#linkBtn").addEventListener("click", () => {
+      pushHistory();
+      state.curve.linkEndpoints = !state.curve.linkEndpoints;
+      if (state.curve.linkEndpoints) state.curve.points[state.curve.points.length - 1].y = state.curve.points[0].y;
+      markModified();
+      renderAll();
+    });
+    $("#resetCurveBtn").addEventListener("click", () => applyPreset("breathe"));
+    $("#addPointBtn").addEventListener("click", () => addPointAt(clamp(state.phase, .05, .95)));
+    $("#deletePointBtn").addEventListener("click", () => deletePoint(selectedPointId));
+    $("#undoBtn").addEventListener("click", undo);
+    $("#redoBtn").addEventListener("click", redo);
+
+    $("#durationRange").addEventListener("pointerdown", pushHistory);
+    $("#durationRange").addEventListener("input", event => {
+      state.duration = Number(event.target.value);
+      state.modified = true;
+      renderControls();
+      renderAnimation();
+    });
+    $("#durationRange").addEventListener("change", saveSoon);
+
+    $$(".swatch").forEach(button => {
+      button.addEventListener("click", () => {
+        pushHistory();
+        if (button.hasAttribute("data-rainbow")) {
+          state.rainbow = true;
+        } else {
+          state.rainbow = false;
+          state.color = button.dataset.color;
+        }
+        renderAll();
+      });
+    });
+
+    $("#customColor").addEventListener("input", event => {
+      state.rainbow = false;
+      state.color = event.target.value;
+      renderAll();
+    });
+    $("#customColor").addEventListener("pointerdown", pushHistory);
+
+    $("#copySettingsBtn").addEventListener("click", copySettings);
+    $("#importBtn").addEventListener("click", openImportDialog);
+    $("#downloadBtn").addEventListener("click", downloadProject);
+    $("#closeDialogBtn").addEventListener("click", closeImportDialog);
+    $("#clearImportBtn").addEventListener("click", () => {
+      $("#importText").value = "";
+      $("#importText").focus();
+    });
+    $("#applyImportBtn").addEventListener("click", applyImportedText);
+    $("#importDialog").addEventListener("click", event => {
+      if (event.target === $("#importDialog")) closeImportDialog();
+    });
+
+    window.addEventListener("keydown", event => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z" && !event.target.matches("textarea, input")) {
+        event.preventDefault();
+        event.shiftKey ? redo() : undo();
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y" && !event.target.matches("textarea, input")) {
+        event.preventDefault();
+        redo();
+      }
+    });
+
+    new ResizeObserver(() => {
+      constrainLedToStage();
+      updateLedGeometry();
+    }).observe(stage);
+
+    async function init() {
+      restoreSavedSettings();
+      let source = FULL_SAMPLE;
+      if (state.imageCustom) {
+        try {
+          source = await idbGet("currentImage") || FULL_SAMPLE;
+          if (source === FULL_SAMPLE) state.imageCustom = false;
+        } catch {
+          source = FULL_SAMPLE;
+          state.imageCustom = false;
+        }
+      }
+      await setImageSource(source, state.imageCustom);
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) state.playing = false;
+      renderAll();
+      requestAnimationFrame(animationFrame);
+    }
+
+    init().catch(error => {
+      console.error(error);
+      showToast("The studio could not initialize");
+    });
+  })();
+  </script>
+</body>
+</html>
