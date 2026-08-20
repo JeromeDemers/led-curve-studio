@@ -1224,7 +1224,7 @@
   <main class="app-shell">
     <header class="app-header">
       <h1 class="brand">LED Curve Studio</h1>
-      <span class="version">v1.1</span>
+      <span class="version">v1.2</span>
     </header>
 
     <div class="studio">
@@ -2815,7 +2815,7 @@
         name: "Arduino Nano R4",
         shortName: "Nano R4",
         transport: "dfu",
-        firmwareUrl: "firmware/nano-r4-player/nano-r4-player.bin",
+        firmwareUrl: "firmware/nano-r4-player/nano-r4-player.bin?v=1.2",
         marker: "LEDCRV-NANOR4-V1",
         builtinDescription: "Nano R4 maps LED_BUILTIN to internal pin 22—not D13—so this uses software PWM."
       },
@@ -2824,7 +2824,7 @@
         name: "Arduino Uno R3 / ATmega328P",
         shortName: "Uno R3",
         transport: "stk500v1",
-        firmwareUrl: "firmware/atmega328p-player/atmega328p-player.bin",
+        firmwareUrl: "firmware/atmega328p-player/atmega328p-player.bin?v=1.2",
         marker: "LEDCRV-AT328P-V1",
         baudRate: 115200,
         pageSize: 128,
@@ -2836,7 +2836,7 @@
         name: "Classic Nano / ATmega328P (new bootloader)",
         shortName: "Classic Nano",
         transport: "stk500v1",
-        firmwareUrl: "firmware/atmega328p-player/atmega328p-player.bin",
+        firmwareUrl: "firmware/atmega328p-player/atmega328p-player.bin?v=1.2",
         marker: "LEDCRV-AT328P-V1",
         baudRate: 115200,
         pageSize: 128,
@@ -2848,7 +2848,7 @@
         name: "Classic Nano / ATmega328P (old bootloader)",
         shortName: "Nano old bootloader",
         transport: "stk500v1",
-        firmwareUrl: "firmware/atmega328p-player/atmega328p-player.bin",
+        firmwareUrl: "firmware/atmega328p-player/atmega328p-player.bin?v=1.2",
         marker: "LEDCRV-AT328P-V1",
         baudRate: 57600,
         pageSize: 128,
@@ -3185,6 +3185,33 @@
       });
     }
 
+    function waitForUsbDisconnect(device, timeoutMs = 5000) {
+      return new Promise((resolve, reject) => {
+        const cleanup = () => {
+          clearTimeout(timeout);
+          navigator.usb.removeEventListener("disconnect", onDisconnect);
+        };
+        const onDisconnect = event => {
+          const sameDevice = event.device === device
+            || (
+              device.serialNumber
+              && event.device.serialNumber === device.serialNumber
+              && event.device.productId === device.productId
+            );
+          if (!sameDevice) return;
+          cleanup();
+          resolve();
+        };
+        navigator.usb.addEventListener("disconnect", onDisconnect);
+        const timeout = setTimeout(() => {
+          cleanup();
+          reject(new Error(
+            "Firmware was written, but Nano R4 did not restart. Press RESET once to run the new pattern."
+          ));
+        }, timeoutMs);
+      });
+    }
+
     async function enterNanoDfu(runtimeDevice) {
       setProgramUi("Switching Nano R4 into DFU mode…", 4);
       const session = await openDfuSession(runtimeDevice, 0x01);
@@ -3283,7 +3310,22 @@
             throw error;
           }
         }
-        try { await device.reset(); } catch {}
+
+        // Nano R4's bootloader deliberately stays in DFU after manifestation.
+        // A USB bus reset alone does not launch the sketch. Arduino's uploader
+        // sends DFU_DETACH first; the bootloader handles that request with an
+        // MCU reset, then boots the newly written application.
+        setProgramUi("Starting Nano R4 with the new pattern…", 99);
+        const disconnected = waitForUsbDisconnect(device);
+        disconnected.catch(() => {});
+        try {
+          await dfuOut(session, DFU.DETACH, new Uint8Array(), 1000);
+        } catch (error) {
+          // Reset can remove the device before Chrome finishes the transfer.
+          console.warn("Final DFU detach transfer ended during reset", error);
+        }
+        await disconnected;
+        await sleep(250);
       } catch (error) {
         // Leave the bootloader in a sane idle state instead of mid-download,
         // otherwise it wedges until a physical reset.
