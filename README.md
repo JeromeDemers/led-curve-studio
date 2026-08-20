@@ -1,5 +1,7 @@
 # LED Curve Studio
 
+**Live: [jeromedemers.github.io/led-curve-studio](https://jeromedemers.github.io/led-curve-studio/)** — the hosted version runs over HTTPS, so direct Arduino programming works there without the local launcher.
+
 A dependency-free LED animation designer that runs entirely in one `index.html`.
 
 ## Use it
