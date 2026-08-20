@@ -5,3 +5,7 @@ Thumbs.db
 *-preview.png
 sample-*.jpg
 browser-smoke.ps1
+
+# Arduino compiler intermediates (the final .bin is kept)
+firmware/**/.build/
+firmware/**/build/
