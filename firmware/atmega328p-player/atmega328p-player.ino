@@ -10,8 +10,10 @@ struct __attribute__((packed)) CurveConfig {
   uint8_t samples[64];
 };
 
+// volatile: the browser patches these bytes in the .bin after compilation,
+// so the compiler must never constant-fold the initializer values.
 __attribute__((used))
-const CurveConfig CURVE_CONFIG = {
+const volatile CurveConfig CURVE_CONFIG = {
   { 'L', 'E', 'D', 'C', 'R', 'V', '-', 'A',
     'T', '3', '2', '8', 'P', '-', 'V', '1' },
   3000,

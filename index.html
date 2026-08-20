@@ -3032,16 +3032,24 @@
       return new Promise(resolve => setTimeout(resolve, milliseconds));
     }
 
-    async function pollDfuUntil(session, predicate) {
-      for (let attempt = 0; attempt < 300; attempt++) {
+    async function pollDfuUntil(session, predicate, budgetMs = 45000) {
+      // Time-based budget: flash erase can hold the bootloader in DNBUSY for
+      // seconds while it reports tiny poll intervals. An iteration cap gives
+      // up during a perfectly healthy erase; a generous time budget does not.
+      const deadline = Date.now() + budgetMs;
+      while (true) {
         const status = await dfuStatus(session);
         if (status.state === DFU.ERROR) {
           throw new Error(`Nano R4 DFU error status ${status.status}`);
         }
         if (predicate(status.state)) return status;
-        await sleep(Math.max(1, status.pollTimeout));
+        if (Date.now() > deadline) {
+          throw new Error(
+            "Nano R4 DFU operation timed out. Double-tap RESET and try again."
+          );
+        }
+        await sleep(Math.min(500, Math.max(5, status.pollTimeout)));
       }
-      throw new Error("Nano R4 DFU operation timed out");
     }
 
     function setProgramUi(message, progress = null, isError = false) {
@@ -3195,23 +3203,55 @@
       return waitingForDfu;
     }
 
+    async function openDfuSessionSettled(device, protocol) {
+      // Right after re-enumeration Windows may still be binding the WinUSB
+      // driver; opening too early gives flaky transfers. Retry briefly.
+      let lastError = null;
+      for (let attempt = 0; attempt < 6; attempt++) {
+        try {
+          const session = await openDfuSession(device, protocol);
+          await dfuStatus(session);
+          return session;
+        } catch (error) {
+          lastError = error;
+          try { await device.close(); } catch {}
+          await sleep(700);
+        }
+      }
+      throw lastError || new Error("Could not open the DFU bootloader");
+    }
+
     async function downloadNanoFirmware(device, firmware) {
-      const session = await openDfuSession(device, 0x02);
+      // Give a freshly-enumerated bootloader a moment to settle first.
+      await sleep(1000);
+      const session = await openDfuSessionSettled(device, 0x02);
       const transferSize = session.properties.transferSize || 1024;
       try {
         let initial = await dfuStatus(session);
+        if (initial.state === DFU.APP_IDLE || initial.status > 15) {
+          // A DFU-mode device reporting app-mode or a nonsense status code is
+          // a bootloader wedged by an earlier aborted download. Only a
+          // physical reset recovers it — fail fast with clear instructions.
+          throw new Error(
+            "The bootloader is in a stuck state. Double-tap the RESET button, then click Program again."
+          );
+        }
         if (initial.state === DFU.ERROR) {
           await dfuOut(session, DFU.CLRSTATUS);
           initial = await dfuStatus(session);
         }
         if (initial.state !== DFU.DFU_IDLE) {
           await dfuOut(session, DFU.ABORT);
-          await pollDfuUntil(session, state => state === DFU.DFU_IDLE);
+          await pollDfuUntil(session, state => state === DFU.DFU_IDLE, 10000);
         }
 
         const bytes = new Uint8Array(firmware);
         let sent = 0;
         let block = 0;
+        setProgramUi(
+          "Erasing Nano R4 flash… the first step can take several seconds.",
+          8
+        );
         while (sent < bytes.length) {
           const end = Math.min(sent + transferSize, bytes.length);
           const chunk = bytes.slice(sent, end);
@@ -3244,6 +3284,12 @@
           }
         }
         try { await device.reset(); } catch {}
+      } catch (error) {
+        // Leave the bootloader in a sane idle state instead of mid-download,
+        // otherwise it wedges until a physical reset.
+        try { await dfuOut(session, DFU.ABORT); } catch {}
+        try { await dfuOut(session, DFU.CLRSTATUS); } catch {}
+        throw error;
       } finally {
         try { await device.close(); } catch {}
       }
