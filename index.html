@@ -997,6 +997,52 @@
       line-height: 1.5;
     }
 
+    .gif-options {
+      padding: 14px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, .42);
+    }
+
+    .gif-options label {
+      display: grid;
+      gap: 7px;
+      color: var(--muted);
+      font-size: .74rem;
+      font-weight: 600;
+      letter-spacing: .03em;
+    }
+
+    .gif-duration-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .gif-duration-input {
+      width: min(180px, 100%);
+      min-height: 42px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 0;
+      color: var(--ink);
+      background: white;
+      font: inherit;
+    }
+
+    .gif-duration-unit {
+      color: var(--ink);
+      font-size: .82rem;
+      font-weight: 600;
+    }
+
+    .gif-summary {
+      margin: 12px 0 0 !important;
+      padding-top: 12px;
+      border-top: 1px solid var(--soft-line);
+      color: var(--ink) !important;
+      font-size: .76rem !important;
+    }
+
     dialog.code-dialog {
       width: min(900px, calc(100vw - 32px));
     }
@@ -1224,7 +1270,7 @@
   <main class="app-shell">
     <header class="app-header">
       <h1 class="brand">LED Curve Studio</h1>
-      <span class="version">v1.2</span>
+      <span class="version">v1.3</span>
     </header>
 
     <div class="studio">
@@ -1412,6 +1458,29 @@
       <div class="dialog-actions">
         <button class="button" id="clearImportBtn" type="button">Clear</button>
         <button class="button primary" id="applyImportBtn" type="button">Apply setup</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="gifDialog">
+    <div class="dialog-header">
+      <h2>Export animated GIF</h2>
+      <button class="button" id="closeGifBtn" type="button">Close</button>
+    </div>
+    <div class="dialog-body">
+      <p>Choose the total GIF playback time. Use a whole number of curve cycles for a seamless loop.</p>
+      <div class="gif-options">
+        <label for="gifDurationInput">
+          GIF duration
+          <span class="gif-duration-row">
+            <input class="gif-duration-input" id="gifDurationInput" type="number" min=".25" max="30" step=".25" inputmode="decimal" value="3" aria-describedby="gifSummary">
+            <span class="gif-duration-unit">seconds</span>
+          </span>
+        </label>
+        <p class="gif-summary" id="gifSummary">3.00s · 60 frames · 1 cycle · seamless loop</p>
+      </div>
+      <div class="dialog-actions">
+        <button class="button primary" id="confirmGifBtn" type="button">Create GIF</button>
       </div>
     </div>
   </dialog>
@@ -4106,12 +4175,99 @@ void loop() {
       return Uint8Array.from(bytes);
     }
 
+    const GIF_MIN_DURATION = .25;
+    const GIF_MAX_DURATION = 30;
+    const GIF_MAX_FRAMES = 240;
+
+    function readGifDuration() {
+      const duration = Number.parseFloat($("#gifDurationInput").value);
+      return Number.isFinite(duration)
+        ? clamp(duration, GIF_MIN_DURATION, GIF_MAX_DURATION)
+        : null;
+    }
+
+    function gifTiming(duration) {
+      const targetFrames = Math.round(
+        clamp(duration * 20, 12, GIF_MAX_FRAMES)
+      );
+      const delayCentiseconds = Math.max(
+        2,
+        Math.round((duration * 100) / targetFrames)
+      );
+      const frameCount = Math.round(
+        clamp(
+          (duration * 100) / delayCentiseconds,
+          2,
+          GIF_MAX_FRAMES
+        )
+      );
+      return {
+        frameCount,
+        delayCentiseconds,
+        encodedDuration: frameCount * delayCentiseconds / 100
+      };
+    }
+
+    function updateGifSummary() {
+      const duration = readGifDuration();
+      const summary = $("#gifSummary");
+      const button = $("#confirmGifBtn");
+      if (duration === null) {
+        summary.textContent = `Enter ${GIF_MIN_DURATION}–${GIF_MAX_DURATION} seconds.`;
+        button.disabled = true;
+        return;
+      }
+
+      const timing = gifTiming(duration);
+      const cycles = duration / state.duration;
+      const nearestWholeCycle = Math.round(cycles);
+      const seamless = Math.abs(cycles - nearestWholeCycle) < .001;
+      const cycleLabel = `${cycles.toFixed(cycles >= 10 ? 1 : 2)} ${Math.abs(cycles - 1) < .001 ? "cycle" : "cycles"}`;
+      const encodedLabel = Math.abs(timing.encodedDuration - duration) >= .01
+        ? ` · encoded ${timing.encodedDuration.toFixed(2)}s`
+        : "";
+      summary.textContent = `${duration.toFixed(2)}s · ${timing.frameCount} frames · ${cycleLabel}${encodedLabel} · ${seamless ? "seamless loop" : "loop may jump"}`;
+      button.disabled = false;
+    }
+
+    function openGifDialog() {
+      const dialog = $("#gifDialog");
+      $("#gifDurationInput").value = state.duration.toFixed(2);
+      updateGifSummary();
+      if (typeof dialog.showModal === "function") dialog.showModal();
+      else dialog.setAttribute("open", "");
+      setTimeout(() => $("#gifDurationInput").select(), 0);
+    }
+
+    function closeGifDialog() {
+      const dialog = $("#gifDialog");
+      if (typeof dialog.close === "function") dialog.close();
+      else dialog.removeAttribute("open");
+    }
+
+    function startGifExport() {
+      const duration = readGifDuration();
+      if (duration === null) {
+        $("#gifDurationInput").focus();
+        updateGifSummary();
+        return;
+      }
+      $("#gifDurationInput").value = duration.toFixed(2);
+      closeGifDialog();
+      exportGif(duration);
+    }
+
     let exportingGif = false;
-    async function exportGif() {
+    async function exportGif(requestedDuration = state.duration) {
       if (exportingGif) return;
       exportingGif = true;
-      const button = $("#exportGifBtn");
-      button.disabled = true;
+      const exportDuration = clamp(
+        Number(requestedDuration) || state.duration,
+        GIF_MIN_DURATION,
+        GIF_MAX_DURATION
+      );
+      const buttons = [$("#exportGifBtn"), $("#confirmGifBtn")];
+      buttons.forEach(button => { button.disabled = true; });
       const yieldToUi = () => new Promise(resolve => setTimeout(resolve));
       try {
         showToast("Rendering GIF frames…");
@@ -4120,8 +4276,8 @@ void loop() {
         const scale = Math.min(1, 480 / Math.max(naturalW, naturalH));
         const width = Math.max(2, Math.round(naturalW * scale));
         const height = Math.max(2, Math.round(naturalH * scale));
-        const frameCount = Math.round(clamp(state.duration * 20, 12, 64));
-        const delayCentiseconds = Math.max(2, Math.round((state.duration * 100) / frameCount));
+        const { frameCount, delayCentiseconds, encodedDuration } =
+          gifTiming(exportDuration);
 
         // Only the glow region changes between frames; encode it alone after frame 1.
         const current = led();
@@ -4142,7 +4298,9 @@ void loop() {
         const ctx = canvas.getContext("2d", { willReadFrequently: true });
         const framePixels = [];
         for (let i = 0; i < frameCount; i++) {
-          drawLedFrame(ctx, width, height, i / frameCount);
+          const elapsedSeconds = i * exportDuration / frameCount;
+          const phase = (elapsedSeconds / state.duration) % 1;
+          drawLedFrame(ctx, width, height, phase);
           if (i === 0) {
             framePixels.push({ left: 0, top: 0, width, height, data: ctx.getImageData(0, 0, width, height).data });
           } else {
@@ -4203,13 +4361,13 @@ void loop() {
         anchor.click();
         anchor.remove();
         URL.revokeObjectURL(url);
-        showToast(`GIF downloaded — ${frameCount} frames, ${state.duration.toFixed(2)}s loop`);
+        showToast(`GIF downloaded — ${frameCount} frames, ${encodedDuration.toFixed(2)}s`);
       } catch (error) {
         console.error(error);
         showToast(error.message || "GIF export failed");
       } finally {
         exportingGif = false;
-        button.disabled = false;
+        buttons.forEach(button => { button.disabled = false; });
       }
     }
 
@@ -4357,7 +4515,13 @@ void loop() {
     $("#copySettingsBtn").addEventListener("click", copySettings);
     $("#importBtn").addEventListener("click", openImportDialog);
     $("#downloadBtn").addEventListener("click", downloadProject);
-    $("#exportGifBtn").addEventListener("click", exportGif);
+    $("#exportGifBtn").addEventListener("click", openGifDialog);
+    $("#closeGifBtn").addEventListener("click", closeGifDialog);
+    $("#confirmGifBtn").addEventListener("click", startGifExport);
+    $("#gifDurationInput").addEventListener("input", updateGifSummary);
+    $("#gifDialog").addEventListener("click", event => {
+      if (event.target === $("#gifDialog")) closeGifDialog();
+    });
     $("#arduinoBtn").addEventListener("click", openArduinoDialog);
     $("#closeArduinoBtn").addEventListener("click", closeArduinoDialog);
     $("#copyArduinoBtn").addEventListener("click", copyArduinoCode);

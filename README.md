@@ -40,7 +40,7 @@ Mega 2560, Leonardo/Micro, Nano Every, Uno R4 WiFi, SAMD/MKR, and ESP32 boards u
 - Settings save automatically in browser storage.
 - Uploaded images are resized to a maximum 1600 px edge and kept locally in IndexedDB.
 - **Arduino code** generates a Nano R4 copy-paste sketch from the current curve and speed. Its built-in LED is `LED_BUILTIN` on internal pin 22 (not D13), driven with non-blocking software PWM, or an external LED can use D9 hardware PWM.
-- **Export GIF** renders one full cycle to a looping animated GIF (480 px wide) with a built-in dependency-free encoder — only the glow region is re-encoded per frame to keep files small.
+- **Export GIF** lets you choose 0.25–30 seconds of playback and shows the frame/cycle count plus whether the result loops seamlessly. The built-in dependency-free encoder renders at up to 480 px and only re-encodes the changing glow region to keep files small.
 - **Copy JSON** shares the small animation and placement setup without the image.
 - **Download project** includes the current image.
 - **Import** accepts either format and validates values before applying them.
